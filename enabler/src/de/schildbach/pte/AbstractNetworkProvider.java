@@ -18,10 +18,7 @@
 package de.schildbach.pte;
 
 import java.io.IOException;
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,11 +26,9 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Strings;
 
-import de.schildbach.pte.dto.Point;
-import de.schildbach.pte.dto.Position;
-import de.schildbach.pte.dto.Product;
-import de.schildbach.pte.dto.Style;
+import de.schildbach.pte.dto.*;
 import de.schildbach.pte.util.HttpClient;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 /**
  * @author Andreas Schildbach
@@ -66,6 +61,11 @@ public abstract class AbstractNetworkProvider implements NetworkProvider
 				return false;
 
 		return true;
+	}
+
+	@Override
+	public QueryDeparturesResult queryArrivals(String stationId, @Nullable Date time, int maxDepartures, boolean equivs) throws IOException {
+		throw new NotImplementedException();
 	}
 
 	protected abstract boolean hasCapability(Capability capability);

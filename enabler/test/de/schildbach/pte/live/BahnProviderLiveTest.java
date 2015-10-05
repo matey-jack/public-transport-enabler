@@ -21,8 +21,10 @@ import static org.hamcrest.CoreMatchers.hasItem;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
+import java.util.Calendar;
 import java.util.Date;
 import java.util.EnumSet;
+import java.util.GregorianCalendar;
 
 import org.junit.Test;
 
@@ -72,7 +74,15 @@ public class BahnProviderLiveTest extends AbstractProviderLiveTest
 	@Test
 	public void queryDepartures() throws Exception
 	{
-		final QueryDeparturesResult result = queryDepartures("692991", false);
+		final QueryDeparturesResult result = queryDepartures("8010404", false);
+		print(result);
+	}
+
+	@Test
+	public void queryArrivals() throws Exception
+	{
+		final Date the_date = new GregorianCalendar(2015, Calendar.OCTOBER, 6, 7, 0).getTime();
+		final QueryDeparturesResult result = provider.queryArrivals("8010404", the_date, 200, false);
 		print(result);
 	}
 

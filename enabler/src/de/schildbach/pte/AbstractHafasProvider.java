@@ -510,10 +510,20 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 	public QueryDeparturesResult queryDepartures(final String stationId, final @Nullable Date time, final int maxDepartures, final boolean equivs)
 			throws IOException
 	{
+		return queryStationBoard(stationId, time, maxDepartures, equivs, StationBoardType.DEPARTURES);
+	}
+
+	public QueryDeparturesResult queryArrivals(final String stationId, final @Nullable Date time, final int maxDepartures, final boolean equivs)
+			throws IOException
+	{
+		return queryStationBoard(stationId, time, maxDepartures, equivs, StationBoardType.ARRIVALS);
+	}
+
+	private QueryDeparturesResult queryStationBoard(String stationId, @Nullable Date time, int maxDepartures, boolean equivs, StationBoardType stationBoardType) throws IOException {
 		checkNotNull(Strings.emptyToNull(stationId));
 
 		final StringBuilder uri = new StringBuilder(stationBoardEndpoint);
-		appendXmlStationBoardParameters(uri, time, stationId, maxDepartures, equivs, "vs_java3");
+		appendXmlStationBoardParameters(uri, time, stationId, maxDepartures, equivs, "vs_java3", stationBoardType);
 
 		return xmlStationBoard(uri.toString(), stationId);
 	}
@@ -521,8 +531,15 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 	protected void appendXmlStationBoardParameters(final StringBuilder uri, final @Nullable Date time, final String stationId,
 			final int maxDepartures, final boolean equivs, final @Nullable String styleSheet)
 	{
+		appendXmlStationBoardParameters(uri, time, stationId, maxDepartures, equivs, styleSheet, StationBoardType.DEPARTURES);
+	}
+
+	protected void appendXmlStationBoardParameters(final StringBuilder uri, final @Nullable Date time, final String stationId,
+			final int maxDepartures, final boolean equivs, final @Nullable String styleSheet, final StationBoardType boardType)
+	{
 		uri.append("?productsFilter=").append(allProductsString());
-		uri.append("&boardType=dep");
+		uri.append("&boardType=");
+		uri.append(boardType.key);
 		if (stationBoardCanDoEquivs)
 			uri.append("&disableEquivs=").append(equivs ? "0" : "1");
 		uri.append("&maxJourneys=").append(maxDepartures > 0 ? maxDepartures : DEFAULT_MAX_DEPARTURES);
@@ -3093,7 +3110,7 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 
 	private static final Pattern P_NORMALIZE_LINE_ADMINISTRATION = Pattern.compile("([^_]*)_*");
 
-	private final String normalizeLineAdministration(final String administration)
+	private String normalizeLineAdministration(final String administration)
 	{
 		if (administration == null)
 			return null;

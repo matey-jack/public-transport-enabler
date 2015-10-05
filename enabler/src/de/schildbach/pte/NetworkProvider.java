@@ -42,7 +42,7 @@ import de.schildbach.pte.dto.SuggestLocationsResult;
  */
 public interface NetworkProvider
 {
-	public enum Capability
+	enum Capability
 	{
 		/* can suggest locations */
 		SUGGEST_LOCATIONS,
@@ -54,26 +54,35 @@ public interface NetworkProvider
 		TRIPS
 	}
 
-	public enum Optimize
+	enum Optimize
 	{
 		LEAST_DURATION, LEAST_CHANGES, LEAST_WALKING
 	}
 
-	public enum WalkSpeed
+	enum WalkSpeed
 	{
 		SLOW, NORMAL, FAST
 	}
 
-	public enum Accessibility
+	enum Accessibility
 	{
 		NEUTRAL, LIMITED, BARRIER_FREE
 	}
 
-	public enum Option
+	enum Option
 	{
 		BIKE
 	}
 
+	enum StationBoardType
+	{
+		ARRIVALS("arr"), DEPARTURES("dep");
+		public final String key;
+
+		StationBoardType(String key) {
+			this.key = key;
+		}
+	}
 	NetworkId id();
 
 	boolean hasCapabilities(final Capability... capabilities);
@@ -97,7 +106,7 @@ public interface NetworkProvider
 
 	/**
 	 * Get departures at a given station, probably live
-	 * 
+	 *
 	 * @param stationId
 	 *            id of the station
 	 * @param time
@@ -110,6 +119,22 @@ public interface NetworkProvider
 	 * @throws IOException
 	 */
 	QueryDeparturesResult queryDepartures(String stationId, @Nullable Date time, int maxDepartures, boolean equivs) throws IOException;
+
+	/**
+	 * Get arrivals at a given station, probably live
+	 *
+	 * @param stationId
+	 *            id of the station
+	 * @param time
+	 *            desired time for departing, or {@code null} for the provider default
+	 * @param maxDepartures
+	 *            maximum number of departures to get or {@code 0}
+	 * @param equivs
+	 *            also query equivalent stations?
+	 * @return result object containing the departures
+	 * @throws IOException
+	 */
+	QueryDeparturesResult queryArrivals(String stationId, @Nullable Date time, int maxDepartures, boolean equivs) throws IOException;
 
 	/**
 	 * Meant for auto-completion of location names, like in an {@link android.widget.AutoCompleteTextView}
