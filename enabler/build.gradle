@@ -1,5 +1,13 @@
 apply plugin: 'java'
-apply plugin: 'eclipse'
+// apply plugin: 'eclipse'
+apply plugin: 'maven'
+
+group = "com.github.matey-jack"
+version = "0.1-SNAPSHOT"
+
+jar {
+    name = 'public transport enabler'
+}
 
 dependencies {
     compile 'com.google.guava:guava:18.0'
@@ -23,8 +31,18 @@ sourceSets {
 }
 
 compileJava {
-    sourceCompatibility '1.5'
-    targetCompatibility '1.5'
+    sourceCompatibility '1.8'
+    targetCompatibility '1.8'
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: "file:///home/robert/.m2/repository/")
+            // pom.version = '3.0Maven'
+            // pom.artifactId = 'public-transport-enabler'
+        }
+    }
 }
 
 test {
