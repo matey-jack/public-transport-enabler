@@ -57,6 +57,7 @@ import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 
 import de.schildbach.pte.dto.Departure;
@@ -644,6 +645,8 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 			reader.replace("</b>", " ");
 			reader.replace("<u>", " ");
 			reader.replace("</u>", " ");
+			reader.replace("<i>", " ");
+			reader.replace("</i>", " ");
 			reader.replace("<br />", " ");
 			reader.replace(" ->", " &#x2192;"); // right arrow
 			reader.replace(" <-", " &#x2190;"); // left arrow
@@ -1003,6 +1006,11 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 				else
 					throw new RuntimeException(err + ": " + errTxt);
 			}
+			else if ("1.10".equals(jsonApiVersion) && svcRes.toString().length() == 170)
+			{
+				// horrible hack, because API version 1.10 doesn't signal invalid stations via error
+				return new QueryDeparturesResult(header, QueryDeparturesResult.Status.INVALID_STATION);
+			}
 			final JSONObject res = svcRes.getJSONObject("res");
 
 			final JSONObject common = res.getJSONObject("common");
@@ -1122,13 +1130,38 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 		}
 	}
 
-	protected final QueryTripsResult jsonTripSearch(final Location from, final Location to, final Date time, final boolean dep,
+	private static final Joiner JOINER = Joiner.on(' ').skipNulls();
+
+	protected final QueryTripsResult jsonTripSearch(Location from, Location to, final Date time, final boolean dep,
 			final @Nullable Set<Product> products, final String moreContext) throws IOException
 	{
+		if (!from.hasId() && from.hasName())
+		{
+			final ResultHeader header = new ResultHeader(network, SERVER_PRODUCT);
+			final List<Location> locations = suggestLocations(JOINER.join(from.place, from.name)).getLocations();
+			if (locations.isEmpty())
+				return new QueryTripsResult(header, QueryTripsResult.Status.UNKNOWN_FROM);
+			if (locations.size() > 1)
+				return new QueryTripsResult(header, locations, null, null);
+			from = locations.get(0);
+		}
+
+		if (!to.hasId() && to.hasName())
+		{
+			final ResultHeader header = new ResultHeader(network, SERVER_PRODUCT);
+			final List<Location> locations = suggestLocations(JOINER.join(to.place, to.name)).getLocations();
+			if (locations.isEmpty())
+				return new QueryTripsResult(header, QueryTripsResult.Status.UNKNOWN_TO);
+			if (locations.size() > 1)
+				return new QueryTripsResult(header, null, null, locations);
+			to = locations.get(0);
+		}
+
 		final Calendar c = new GregorianCalendar(timeZone);
 		c.setTime(time);
 		final CharSequence outDate = jsonDate(c);
 		final CharSequence outTime = jsonTime(c);
+		final CharSequence outFrwdKey = "1.11".equals(jsonApiVersion) ? "outFrwd" : "frwd";
 		final CharSequence outFrwd = Boolean.toString(dep);
 		final CharSequence jnyFltr = productsString(products);
 		final CharSequence jsonContext = moreContext != null ? "\"ctxScr\":" + JSONObject.quote(moreContext) + "," : "";
@@ -1138,10 +1171,10 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 				+ "\"arrLocL\":[" + jsonLocation(to) + "]," //
 				+ "\"outDate\":\"" + outDate + "\"," //
 				+ "\"outTime\":\"" + outTime + "\"," //
-				+ "\"outFrwd\":" + outFrwd + "," //
+				+ "\"" + outFrwdKey + "\":" + outFrwd + "," //
 				+ "\"jnyFltrL\":[{\"value\":\"" + jnyFltr + "\",\"mode\":\"BIT\",\"type\":\"PROD\"}]," //
 				+ "\"gisFltrL\":[{\"mode\":\"FB\",\"profile\":{\"type\":\"F\",\"linDistRouting\":false,\"maxdist\":2000},\"type\":\"P\"}]," //
-				+ "\"getPolyline\":false,\"getPasslist\":true,\"liveSearch\":false,\"getIST\":false,\"getEco\":false,\"extChgTime\":-1,\"economic\":false}", //
+				+ "\"getPolyline\":false,\"getPasslist\":true,\"getIST\":false,\"getEco\":false,\"extChgTime\":-1}", //
 				false);
 
 		final String uri = checkNotNull(mgateEndpoint);
@@ -1164,10 +1197,14 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 			{
 				if ("H890".equals(err)) // No connections found.
 					return new QueryTripsResult(header, QueryTripsResult.Status.NO_TRIPS);
+				if ("H891".equals(err)) // No route found (try entering an intermediate station).
+					return new QueryTripsResult(header, QueryTripsResult.Status.NO_TRIPS);
 				if ("H895".equals(err)) // Departure/Arrival are too near.
 					return new QueryTripsResult(header, QueryTripsResult.Status.TOO_CLOSE);
 				if ("H9220".equals(err)) // Nearby to the given address stations could not be found.
 					return new QueryTripsResult(header, QueryTripsResult.Status.UNRESOLVABLE_ADDRESS);
+				if ("H9360".equals(err)) // Date outside of the timetable period.
+					return new QueryTripsResult(header, QueryTripsResult.Status.INVALID_DATE);
 				final String errTxt = svcRes.getString("errTxt");
 				throw new RuntimeException(err + ": " + errTxt);
 			}
@@ -1443,7 +1480,16 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 			final int cls = prod.optInt("cls", -1);
 			final Product product = cls != -1 ? intToProduct(cls) : null;
 			final String name = prod.getString("name");
-			final Line line = new Line(null, operator, product, name, lineStyle(operator, product, name));
+			final String normalizedName;
+			if (product == Product.BUS && name.startsWith("Bus "))
+				normalizedName = name.substring(4);
+			else if (product == Product.TRAM && name.startsWith("Tram "))
+				normalizedName = name.substring(5);
+			else if (product == Product.SUBURBAN_TRAIN && name.startsWith("S "))
+				normalizedName = "S" + name.substring(2);
+			else
+				normalizedName = name;
+			final Line line = new Line(null, operator, product, normalizedName, lineStyle(operator, product, normalizedName));
 			lines.add(line);
 		}
 
@@ -2706,6 +2752,8 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 			else if (errorCode == 13)
 				// IN13: Our booking system is currently being used by too many users at the same time.
 				return new QueryTripsResult(header, QueryTripsResult.Status.SERVICE_DOWN);
+			else if (errorCode == 19)
+				return new QueryTripsResult(header, QueryTripsResult.Status.SERVICE_DOWN);
 			else if (errorCode == 207)
 				// H207: Unfortunately your connection request can currently not be processed.
 				return new QueryTripsResult(header, QueryTripsResult.Status.SERVICE_DOWN);
@@ -3303,7 +3351,7 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 			return Product.HIGH_SPEED_TRAIN;
 		if ("TGV".equals(ucType)) // Train à Grande Vitesse
 			return Product.HIGH_SPEED_TRAIN;
-		if ("DNZ".equals(ucType)) // Nachtzug Basel-Moskau
+		if ("DNZ".equals(ucType)) // Nacht-Schnellzug
 			return Product.HIGH_SPEED_TRAIN;
 		if ("AIR".equals(ucType)) // Generic Flight
 			return Product.HIGH_SPEED_TRAIN;
@@ -3570,6 +3618,12 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 		if ("OPX".equals(ucType)) // oberpfalz-express
 			return Product.REGIONAL_TRAIN;
 		if ("TER".equals(ucType)) // Transport express régional
+			return Product.REGIONAL_TRAIN;
+		if ("ENO".equals(ucType))
+			return Product.REGIONAL_TRAIN;
+		if ("THU".equals(ucType)) // Thurbo AG
+			return Product.REGIONAL_TRAIN;
+		if ("GW".equals(ucType)) // gwtr.cz
 			return Product.REGIONAL_TRAIN;
 
 		// Suburban Trains
