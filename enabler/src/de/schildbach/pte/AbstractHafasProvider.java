@@ -595,8 +595,7 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 			final int maxDepartures, final boolean equivs, final @Nullable String styleSheet, final StationBoardType boardType)
 	{
 		uri.append("?productsFilter=").append(allProductsString());
-		uri.append("&boardType=");
-		uri.append(boardType.key);
+		uri.append("&boardType=").append(boardType.key);
 		if (stationBoardCanDoEquivs)
 			uri.append("&disableEquivs=").append(equivs ? "0" : "1");
 		uri.append("&maxJourneys=").append(maxDepartures > 0 ? maxDepartures : DEFAULT_MAX_DEPARTURES);
@@ -620,8 +619,9 @@ public abstract class AbstractHafasProvider extends AbstractNetworkProvider
 		final int hour = c.get(Calendar.HOUR_OF_DAY);
 		final int minute = c.get(Calendar.MINUTE);
 		uri.append('&').append(dateParamName).append('=');
-		uri.append(ParserUtils.urlEncode(useIso8601 ? String.format(Locale.ENGLISH, "%04d-%02d-%02d", year, month, day) : String.format(
-				Locale.ENGLISH, "%02d.%02d.%02d", day, month, year - 2000)));
+		uri.append(ParserUtils.urlEncode(useIso8601
+				? String.format(Locale.ENGLISH, "%04d-%02d-%02d", year, month, day)
+				: String.format(Locale.ENGLISH, "%02d.%02d.%02d", day, month, year - 2000)));
 		uri.append('&').append(timeParamName).append('=');
 		uri.append(ParserUtils.urlEncode(String.format(Locale.ENGLISH, "%02d:%02d", hour, minute)));
 	}
